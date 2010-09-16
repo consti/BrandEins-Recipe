@@ -6,6 +6,7 @@ __copyright__ = '2010, Constantin Hofstetter <consti at consti.de>'
 
 ''' http://brandeins.de - Wirtschaftsmagazin '''
 import re
+import string
 from calibre.web.feeds.recipes import BasicNewsRecipe
 
 class BrandEins(BasicNewsRecipe):
@@ -21,29 +22,33 @@ class BrandEins(BasicNewsRecipe):
   encoding = 'utf-8'
   language = 'de'
 
-  keep_only_tags = [dict(name='div', attrs={'id':'theContent'}), dict(name='div', attrs={'id':'sidebar'}), dict(name='div', attrs={'class':'single_image'})]
+  keep_only_tags = [dict(name='div', attrs={'id':'theContent'}), dict(name='div', attrs={'id':'sidebar'}), dict(name='div', attrs={'class':'intro'}), dict(name='p', attrs={'class':'bodytext'}), dict(name='div', attrs={'class':'single_image'})]
 
   '''
   brandeins.de
   '''
   
   def postprocess_html(self, soup,first):
-    # for img in soup.findAll('img', src=True):
-    #       if img['src'].startswith('http:'): img.extract()
-
+    
+    # Move the image of the sidebar right below the h3
     first_h3 = soup.find(name='div', attrs={'id':'theContent'}).find('h3')
-
     for imgdiv in soup.findAll(name='div', attrs={'class':'single_image'}):
       first_h3.parent.insert(2, imgdiv)
 
+    # Now, remove the sidebar
     soup.find(name='div', attrs={'id':'sidebar'}).extract()
-    
+
+    # Remove the rating-image (stars) from the h3
     for img in first_h3.findAll(name='img'):
         img.extract()
-    # for tag in soup.findAll(name='div', attrs={'id':'theContent'}):
-    #   original=str(tag)
-    #   pureText=re.sub('<>','',original)
-    #   tag.replaceWith(pureText)
+    
+    # Mark the intro texts as italic
+    for div in soup.findAll(name='div', attrs={'class':'intro'}):
+      for p in div.findAll('p'):
+        content = self.tag_to_string(p)
+        new_p = "<p><i>"+ content +"</i></p>"
+        p.replaceWith(new_p)
+    
     return soup
   
   
@@ -71,7 +76,7 @@ class BrandEins(BasicNewsRecipe):
     
     titles_and_articles = []
     current_articles = []
-    chapter_title = "EDITORIAL"
+    chapter_title = "Editorial"
     self.log('Found Chapter:', chapter_title)
 
     # Remove last list of links (thats just the impressum and the 'gewinnspiel')
@@ -80,7 +85,7 @@ class BrandEins(BasicNewsRecipe):
     for article_list in article_lists:
       for chapter in article_list.findAll('ul'):
         if len(chapter.findPreviousSiblings('h3')) >= 1:
-          new_chapter_title = self.tag_to_string(chapter.findPreviousSiblings('h3')[0])
+          new_chapter_title = string.capwords(self.tag_to_string(chapter.findPreviousSiblings('h3')[0]))
           if new_chapter_title != chapter_title:
             titles_and_articles.append([chapter_title, current_articles])
             current_articles = []
