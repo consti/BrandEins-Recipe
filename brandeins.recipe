@@ -110,8 +110,15 @@ class BrandEins(BasicNewsRecipe):
           if not url or not title:
             continue
           url = 'http://brandeins.de/'+url
+          if len(a.parent.findNextSiblings('p')) >= 1:
+            description = self.tag_to_string(a.parent.findNextSiblings('p')[0])
+          else:
+            description = ''
+
           self.log('\t\tFound article:', title)
           self.log('\t\t\t', url)
-          current_articles.append({'title': title, 'url': url, 'description':'', 'date':''})
+          self.log('\t\t\t', description)
+          
+          current_articles.append({'title': title, 'url': url, 'description': description, 'date':''})
     titles_and_articles.append([chapter_title, current_articles])    
     return titles_and_articles
