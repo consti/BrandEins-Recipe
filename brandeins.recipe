@@ -33,7 +33,11 @@ class BrandEins(BasicNewsRecipe):
     # Move the image of the sidebar right below the h3
     first_h3 = soup.find(name='div', attrs={'id':'theContent'}).find('h3')
     for imgdiv in soup.findAll(name='div', attrs={'class':'single_image'}):
-      first_h3.parent.insert(2, imgdiv)
+      if len(first_h3.findNextSiblings('div', {'class':'intro'})) >= 1:
+        # first_h3.parent.insert(2, imgdiv)
+        first_h3.findNextSiblings('div', {'class':'intro'})[0].parent.insert(4, imgdiv)
+      else:
+        first_h3.parent.insert(2, imgdiv)
 
     # Now, remove the sidebar
     soup.find(name='div', attrs={'id':'sidebar'}).extract()
