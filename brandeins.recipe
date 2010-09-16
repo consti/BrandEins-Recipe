@@ -50,29 +50,44 @@ class BrandEins(BasicNewsRecipe):
   def parse_index(self):
     feeds = []
     url = "http://www.brandeins.de/archiv/magazin/tierisch.html"
-    articles_and_titles = self.brand_eins_parse_latest_issue(url)
-    if articles_and_titles:
-      for title, articles in articles_and_titles:
+    titles_and_articles = self.brand_eins_parse_latest_issue(url)
+    if titles_and_articles:
+      for title, articles in titles_and_articles:
         feeds.append((title, articles))
     return feeds
 
   def brand_eins_parse_latest_issue(self, url):
     soup = self.index_to_soup(url)
-    article_lists = soup.findAll('div', attrs={'class':'subColumnLeft articleList'})
+    article_lists = [soup.find('div', attrs={'class':'subColumnLeft articleList'}), soup.find('div', attrs={'class':'subColumnRight articleList'})]
     
+    titles_and_articles = []
     current_articles = []
-    for article_list in article_lists:
-      for li in article_list.findAll('li'):
-        a = li.find('a', href = True)
-        if a is None:
-          continue
-        title = self.tag_to_string(a)
-        url = a.get('href', False)
-        if not url or not title:
-          continue
-        url = 'http://brandeins.de/'+url
-        self.log('\t\tFound article:', title)
-        self.log('\t\t\t', url)
-        current_articles.append({'title': title, 'url': url, 'description':'', 'date':''})
+    chapter_title = "EDITORIAL"
+    self.log('Found Chapter:', chapter_title)
 
-      return [("Artikel", current_articles)]
+    # Remove last list of links (thats just the impressum and the 'gewinnspiel')
+    article_lists[1].findAll('ul')[len(article_lists[1].findAll('ul'))-1].extract()
+
+    for article_list in article_lists:
+      for chapter in article_list.findAll('ul'):
+        if len(chapter.findPreviousSiblings('h3')) >= 1:
+          new_chapter_title = self.tag_to_string(chapter.findPreviousSiblings('h3')[0])
+          if new_chapter_title != chapter_title:
+            titles_and_articles.append([chapter_title, current_articles])
+            current_articles = []
+            self.log('Found Chapter:', new_chapter_title)
+          chapter_title = new_chapter_title
+        for li in chapter.findAll('li'):
+          a = li.find('a', href = True)
+          if a is None:
+            continue
+          title = self.tag_to_string(a)
+          url = a.get('href', False)
+          if not url or not title:
+            continue
+          url = 'http://brandeins.de/'+url
+          self.log('\t\tFound article:', title)
+          self.log('\t\t\t', url)
+          current_articles.append({'title': title, 'url': url, 'description':'', 'date':''})
+    titles_and_articles.append([chapter_title, current_articles])    
+    return titles_and_articles
