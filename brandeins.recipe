@@ -3,6 +3,7 @@
 
 __license__   = 'GPL v3'
 __copyright__ = '2010, Constantin Hofstetter <consti at consti.de>'
+__version__   = '0.95'
 
 ''' http://brandeins.de - Wirtschaftsmagazin '''
 import re
