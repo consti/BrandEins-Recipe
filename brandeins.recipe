@@ -22,6 +22,11 @@ class BrandEins(BasicNewsRecipe):
   encoding = 'utf-8'
   language = 'de'
 
+  # 2 is the last full magazine (default)
+  # 1 is the newest (but not full)
+  # 3 is one before 2 etc.
+  which_ausgabe = 2
+
   keep_only_tags = [dict(name='div', attrs={'id':'theContent'}), dict(name='div', attrs={'id':'sidebar'}), dict(name='div', attrs={'class':'intro'}), dict(name='p', attrs={'class':'bodytext'}), dict(name='div', attrs={'class':'single_image'})]
 
   '''
@@ -55,7 +60,6 @@ class BrandEins(BasicNewsRecipe):
     
     return soup
   
-  
   def parse_index(self):
     feeds = []
     
@@ -63,8 +67,10 @@ class BrandEins(BasicNewsRecipe):
     
     soup = self.index_to_soup(archive)
     latest_jahrgang = soup.findAll('div', attrs={'class': re.compile(r'\bjahrgang-latest\b') })[0].findAll('ul')[0]
-    pre_latest_issue = latest_jahrgang.findAll('a')[len(latest_jahrgang.findAll('a'))-2]
+    pre_latest_issue = latest_jahrgang.findAll('a')[len(latest_jahrgang.findAll('a'))-self.which_ausgabe]
     url = pre_latest_issue.get('href', False)
+    # Get the title for the magazin - build it out of the title of the cover - take the issue and year;
+    self.title = "Brand Eins "+ re.search(r"(?P<date>\d\d\/\d\d\d\d+)", pre_latest_issue.find('img').get('title', False)).group('date')
     url = 'http://brandeins.de/'+url
     
     # url = "http://www.brandeins.de/archiv/magazin/tierisch.html"
