@@ -1,0 +1,78 @@
+#!/usr/bin/env  python
+# -*- coding: utf-8 -*-
+
+__license__   = 'GPL v3'
+__copyright__ = '2010, Constantin Hofstetter <consti at consti.de>'
+
+''' http://brandeins.de - Wirtschaftsmagazin '''
+import re
+from calibre.web.feeds.recipes import BasicNewsRecipe
+
+class BrandEins(BasicNewsRecipe):
+
+  title = u'Brand Eins'
+  __author__ = 'Constantin Hofstetter'
+  description = u'Wirtschaftsmagazin'
+  publisher ='brandeins.de'
+  category = 'politics, business, wirtschaft, Germany'
+  use_embedded_content = False
+  lang = 'de-DE'
+  no_stylesheets = True
+  encoding = 'utf-8'
+  language = 'de'
+
+  keep_only_tags = [dict(name='div', attrs={'id':'theContent'}), dict(name='div', attrs={'id':'sidebar'}), dict(name='div', attrs={'class':'single_image'})]
+
+  '''
+  brandeins.de
+  '''
+  
+  def postprocess_html(self, soup,first):
+    # for img in soup.findAll('img', src=True):
+    #       if img['src'].startswith('http:'): img.extract()
+
+    first_h3 = soup.find(name='div', attrs={'id':'theContent'}).find('h3')
+
+    for imgdiv in soup.findAll(name='div', attrs={'class':'single_image'}):
+      first_h3.parent.insert(2, imgdiv)
+
+    soup.find(name='div', attrs={'id':'sidebar'}).extract()
+    
+    for img in first_h3.findAll(name='img'):
+        img.extract()
+    # for tag in soup.findAll(name='div', attrs={'id':'theContent'}):
+    #   original=str(tag)
+    #   pureText=re.sub('<>','',original)
+    #   tag.replaceWith(pureText)
+    return soup
+  
+  
+  def parse_index(self):
+    feeds = []
+    url = "http://www.brandeins.de/archiv/magazin/tierisch.html"
+    articles_and_titles = self.brand_eins_parse_latest_issue(url)
+    if articles_and_titles:
+      for title, articles in articles_and_titles:
+        feeds.append((title, articles))
+    return feeds
+
+  def brand_eins_parse_latest_issue(self, url):
+    soup = self.index_to_soup(url)
+    article_lists = soup.findAll('div', attrs={'class':'subColumnLeft articleList'})
+    
+    current_articles = []
+    for article_list in article_lists:
+      for li in article_list.findAll('li'):
+        a = li.find('a', href = True)
+        if a is None:
+          continue
+        title = self.tag_to_string(a)
+        url = a.get('href', False)
+        if not url or not title:
+          continue
+        url = 'http://brandeins.de/'+url
+        self.log('\t\tFound article:', title)
+        self.log('\t\t\t', url)
+        current_articles.append({'title': title, 'url': url, 'description':'', 'date':''})
+
+      return [("Artikel", current_articles)]
