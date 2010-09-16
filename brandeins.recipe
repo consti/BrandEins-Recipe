@@ -49,7 +49,16 @@ class BrandEins(BasicNewsRecipe):
   
   def parse_index(self):
     feeds = []
-    url = "http://www.brandeins.de/archiv/magazin/tierisch.html"
+    
+    archive = "http://www.brandeins.de/archiv.html"
+    
+    soup = self.index_to_soup(archive)
+    latest_jahrgang = soup.findAll('div', attrs={'class': re.compile(r'\bjahrgang-latest\b') })[0].findAll('ul')[0]
+    pre_latest_issue = latest_jahrgang.findAll('a')[len(latest_jahrgang.findAll('a'))-2]
+    url = pre_latest_issue.get('href', False)
+    url = 'http://brandeins.de/'+url
+    
+    # url = "http://www.brandeins.de/archiv/magazin/tierisch.html"
     titles_and_articles = self.brand_eins_parse_latest_issue(url)
     if titles_and_articles:
       for title, articles in titles_and_articles:
