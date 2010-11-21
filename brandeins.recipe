@@ -1,18 +1,68 @@
 #!/usr/bin/env  python
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8 mode: python -*-
 
 __license__   = 'GPL v3'
-__copyright__ = '2010, Constantin Hofstetter <consti at consti.de>'
-__version__   = '0.95'
+__copyright__ = '2010, Constantin Hofstetter <consti at consti.de>, Steffen Siebert <calibre at steffensiebert.de>'
+__version__   = '0.96'
 
 ''' http://brandeins.de - Wirtschaftsmagazin '''
 import re
 import string
 from calibre.web.feeds.recipes import BasicNewsRecipe
+from calibre.web.feeds.templates import Template, CLASS
+from lxml.html.builder import HTML, HEAD, TITLE, STYLE, DIV, BODY, BR, A, HR, UL
+
+class MyNavBarTemplate(Template):
+  """
+  Same as calibre.web.feeds.templates.NavBarTemplate but without the
+  'This article was downloaded by calibre from...'
+  text at the bottom.
+  """
+
+  def _generate(self, bottom, feed, art, number_of_articles_in_feed,
+                two_levels, url, __appname__, prefix='', center=True,
+                extra_css=None, style=None):
+    head = HEAD(TITLE('navbar'))
+    if style:
+      head.append(STYLE(style, type='text/css'))
+    if extra_css:
+      head.append(STYLE(extra_css, type='text/css'))
+
+    if prefix and not prefix.endswith('/'):
+      prefix += '/'
+    align = 'center' if center else 'left'
+
+    navbar = DIV(CLASS('calibre_navbar', 'calibre_rescale_70',
+                       style='text-align:'+align))
+    if bottom:
+      if not url.startswith('file://'):
+        navbar.append(HR())
+    else:
+      next = 'feed_%d'%(feed+1) if art == number_of_articles_in_feed - 1 \
+          else 'article_%d'%(art+1)
+      up = '../..' if art == number_of_articles_in_feed - 1 else '..'
+      href = '%s%s/%s/index.html'%(prefix, up, next)
+      navbar.text = '| '
+      navbar.append(A('Next', href=href))
+    href = '%s../index.html#article_%d'%(prefix, art)
+    navbar.iterchildren(reversed=True).next().tail = ' | '
+    navbar.append(A('Section Menu', href=href))
+    href = '%s../../index.html#feed_%d'%(prefix, feed)
+    navbar.iterchildren(reversed=True).next().tail = ' | '
+    navbar.append(A('Main Menu', href=href))
+    if art > 0 and not bottom:
+      href = '%s../article_%d/index.html'%(prefix, art-1)
+      navbar.iterchildren(reversed=True).next().tail = ' | '
+      navbar.append(A('Previous', href=href))
+    navbar.iterchildren(reversed=True).next().tail = ' | '
+    if not bottom:
+      navbar.append(HR())
+
+    self.root = HTML(head, BODY(navbar))
 
 class BrandEins(BasicNewsRecipe):
 
-  title = u'Brand Eins'
+  title = u'brand eins'
   __author__ = 'Constantin Hofstetter'
   description = u'Wirtschaftsmagazin'
   publisher ='brandeins.de'
@@ -22,20 +72,30 @@ class BrandEins(BasicNewsRecipe):
   no_stylesheets = True
   encoding = 'utf-8'
   language = 'de'
+  publication_type = 'magazine'
+  needs_subscription = True
+  # Prevent that conversion date is appended to title
+  timefmt = ''
 
   # 2 is the last full magazine (default)
   # 1 is the newest (but not full)
   # 3 is one before 2 etc.
-  which_ausgabe = 2
+  # This value can be set via the username field.
+  default_issue = 2
 
   keep_only_tags = [dict(name='div', attrs={'id':'theContent'}), dict(name='div', attrs={'id':'sidebar'}), dict(name='div', attrs={'class':'intro'}), dict(name='p', attrs={'class':'bodytext'}), dict(name='div', attrs={'class':'single_image'})]
 
   '''
   brandeins.de
   '''
+
+  def __init__(self, options, log, progress_reporter):
+    """ Constructor. """
+    BasicNewsRecipe.__init__(self, options, log, progress_reporter)
+    self.navbar = MyNavBarTemplate()
   
   def postprocess_html(self, soup,first):
-    
+
     # Move the image of the sidebar right below the h3
     first_h3 = soup.find(name='div', attrs={'id':'theContent'}).find('h3')
     for imgdiv in soup.findAll(name='div', attrs={'class':'single_image'}):
@@ -51,29 +111,43 @@ class BrandEins(BasicNewsRecipe):
     # Remove the rating-image (stars) from the h3
     for img in first_h3.findAll(name='img'):
         img.extract()
-    
+
     # Mark the intro texts as italic
     for div in soup.findAll(name='div', attrs={'class':'intro'}):
       for p in div.findAll('p'):
         content = self.tag_to_string(p)
         new_p = "<p><i>"+ content +"</i></p>"
         p.replaceWith(new_p)
-    
+
     return soup
-  
+
+  def get_cover(self, soup):
+    cover_url = None
+    cover_item = soup.find('div', attrs = {'class': 'cover_image'})
+    if cover_item:
+      cover_url = 'http://www.brandeins.de/' + cover_item.img['src']
+    return cover_url
+
   def parse_index(self):
     feeds = []
-    
+
     archive = "http://www.brandeins.de/archiv.html"
-    
+
+    issue = self.default_issue
+    if self.username:
+      try:
+        issue = int(self.username)
+      except:
+        pass
+
     soup = self.index_to_soup(archive)
     latest_jahrgang = soup.findAll('div', attrs={'class': re.compile(r'\bjahrgang-latest\b') })[0].findAll('ul')[0]
-    pre_latest_issue = latest_jahrgang.findAll('a')[len(latest_jahrgang.findAll('a'))-self.which_ausgabe]
+    pre_latest_issue = latest_jahrgang.findAll('a')[len(latest_jahrgang.findAll('a'))-issue]
     url = pre_latest_issue.get('href', False)
     # Get the title for the magazin - build it out of the title of the cover - take the issue and year;
-    self.title = "Brand Eins "+ re.search(r"(?P<date>\d\d\/\d\d\d\d+)", pre_latest_issue.find('img').get('title', False)).group('date')
+    self.title = "brand eins "+ re.search(r"(?P<date>\d\d\/\d\d\d\d)", pre_latest_issue.find('img').get('title', False)).group('date')
     url = 'http://brandeins.de/'+url
-    
+
     # url = "http://www.brandeins.de/archiv/magazin/tierisch.html"
     titles_and_articles = self.brand_eins_parse_latest_issue(url)
     if titles_and_articles:
@@ -83,8 +157,9 @@ class BrandEins(BasicNewsRecipe):
 
   def brand_eins_parse_latest_issue(self, url):
     soup = self.index_to_soup(url)
+    self.cover_url = self.get_cover(soup)
     article_lists = [soup.find('div', attrs={'class':'subColumnLeft articleList'}), soup.find('div', attrs={'class':'subColumnRight articleList'})]
-    
+
     titles_and_articles = []
     current_articles = []
     chapter_title = "Editorial"
@@ -119,7 +194,7 @@ class BrandEins(BasicNewsRecipe):
           self.log('\t\tFound article:', title)
           self.log('\t\t\t', url)
           self.log('\t\t\t', description)
-          
+
           current_articles.append({'title': title, 'url': url, 'description': description, 'date':''})
-    titles_and_articles.append([chapter_title, current_articles])    
+    titles_and_articles.append([chapter_title, current_articles])
     return titles_and_articles
