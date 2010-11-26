@@ -1,9 +1,6 @@
 #!/usr/bin/env  python
 # -*- coding: utf-8 mode: python -*-
 
-# Find the newest version of this recipe here:
-# https://github.com/consti/BrandEins-Recipe/raw/master/brandeins.recipe
-
 __license__   = 'GPL v3'
 __copyright__ = '2010, Constantin Hofstetter <consti at consti.de>, Steffen Siebert <calibre at steffensiebert.de>'
 __version__   = '0.96'
